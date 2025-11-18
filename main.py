@@ -39,8 +39,8 @@ while ejecutando:
   player_y += vel_y
 
   if player_y >= Suelo_Y - player_size:
-  player_y = Suelo_Y - player_size
-  vel_y = 0  
+    player_y = Suelo_Y - player_size
+    vel_y = 0  
  
 
   screen.fill(black)
