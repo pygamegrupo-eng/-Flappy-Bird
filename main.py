@@ -25,10 +25,10 @@ class Jugador:
     def __init__(self):
         self.tamaño = 40
         self.x = 100
-        self.y = SUELO_Y - self.tamaño  # Ahora sí toca el suelo
+        self.y = SUELO_Y - self.tamaño
         self.velocidad_y = 0
-        self.gravedad = 0.8
-        self.fuerza_salto = -15
+        self.gravedad = 0.9  # Gravedad similar al Geometry Dash original
+        self.fuerza_salto = -12  # Fuerza de salto ajustada
         self.en_suelo = True
     
     def saltar(self):
@@ -36,15 +36,37 @@ class Jugador:
             self.velocidad_y = self.fuerza_salto
             self.en_suelo = False
     
-    def actualizar(self):
+    def actualizar(self, obstaculos=None):
         self.velocidad_y += self.gravedad
         self.y += self.velocidad_y
         
-        # Verificar si está en el suelo (CORREGIDO)
+        # Verificar si está en el suelo o en una plataforma
+        self.en_suelo = False
+        
+        # Primero verificar si está en el suelo
         if self.y >= SUELO_Y - self.tamaño:
             self.y = SUELO_Y - self.tamaño
             self.velocidad_y = 0
             self.en_suelo = True
+        
+        # Luego verificar si está sobre algún obstáculo (plataforma)
+        if obstaculos:
+            for obstaculo in obstaculos:
+                # Solo los bloques pueden servir como plataformas
+                if isinstance(obstaculo, Bloque):
+                    rect_jugador = self.obtener_rectangulo()
+                    rect_obstaculo = obstaculo.obtener_rectangulo()
+                    
+                    # Verificar si el jugador está cayendo y está encima del obstáculo
+                    if (self.velocidad_y >= 0 and 
+                        rect_jugador.bottom >= rect_obstaculo.top and
+                        rect_jugador.bottom - self.velocidad_y <= rect_obstaculo.top and
+                        rect_jugador.right > rect_obstaculo.left and
+                        rect_jugador.left < rect_obstaculo.right):
+                        
+                        self.y = rect_obstaculo.top - self.tamaño
+                        self.velocidad_y = 0
+                        self.en_suelo = True
     
     def dibujar(self, pantalla):
         pygame.draw.rect(pantalla, AMARILLO, (self.x, self.y, self.tamaño, self.tamaño))
@@ -116,15 +138,52 @@ class Nivel:
                 self.obstaculos.append(Pincho(x))
         
         elif self.numero == 2:
-            # Nivel 2: Pinchos y bloques
-            posiciones_pinchos = [400, 700, 1000, 1300, 1600]
-            posiciones_bloques = [550, 850, 1150, 1450]
+            # Nivel 2: Más largo, bien espaciado y jugable
+            # SECCIÓN 1: Introducción con pinchos simples
+            self.obstaculos.append(Pincho(400))
+            self.obstaculos.append(Pincho(550))
             
-            for x in posiciones_pinchos:
-                self.obstaculos.append(Pincho(x))
+            # SECCIÓN 2: Primera plataforma y pinchos
+            self.obstaculos.append(Bloque(750, 120, 25))
+            self.obstaculos.append(Pincho(950))
+            self.obstaculos.append(Pincho(1100))
             
-            for x in posiciones_bloques:
-                self.obstaculos.append(Bloque(x))
+            # SECCIÓN 3: Patrón de tres pinchos
+            self.obstaculos.append(Pincho(1300))
+            self.obstaculos.append(Pincho(1450))
+            self.obstaculos.append(Pincho(1600))
+            
+            # SECCIÓN 4: Plataformas en escalera ascendente
+            self.obstaculos.append(Bloque(1800, 80, 40))
+            self.obstaculos.append(Bloque(1920, 80, 60))
+            self.obstaculos.append(Bloque(2040, 80, 80))
+            
+            # SECCIÓN 5: Pinchos después de la escalera
+            self.obstaculos.append(Pincho(2200))
+            self.obstaculos.append(Pincho(2350))
+            
+            # SECCIÓN 6: Plataforma larga con pincho en medio
+            self.obstaculos.append(Bloque(2550, 200, 30))
+            self.obstaculos.append(Pincho(2650))
+            
+            # SECCIÓN 7: Escalera descendente
+            alturas_descendentes = [100, 80, 60, 40, 20]
+            for i, altura in enumerate(alturas_descendentes):
+                self.obstaculos.append(Bloque(2850 + i * 70, 60, altura))
+            
+            # SECCIÓN 8: Patrón de pinchos final
+            self.obstaculos.append(Pincho(3250))
+            self.obstaculos.append(Pincho(3400))
+            self.obstaculos.append(Pincho(3550))
+            self.obstaculos.append(Pincho(3700))
+            
+            # SECCIÓN 9: Última plataforma y pincho final
+            self.obstaculos.append(Bloque(3900, 150, 35))
+            self.obstaculos.append(Pincho(4100))
+            
+            # SECCIÓN 10: Gran salto final
+            self.obstaculos.append(Bloque(4300, 100, 50))
+            self.obstaculos.append(Pincho(4500))
         
         elif self.numero == 3:
             # Nivel 3: Más obstáculos
@@ -139,6 +198,7 @@ class Nivel:
     
     def actualizar(self):
         for obstaculo in self.obstaculos[:]:
+            obstaculo.velocidad = self.velocidad
             obstaculo.actualizar()
             if obstaculo.esta_fuera():
                 self.obstaculos.remove(obstaculo)
@@ -158,6 +218,13 @@ class Nivel:
         rect_jugador = jugador.obtener_rectangulo()
         for obstaculo in self.obstaculos:
             if rect_jugador.colliderect(obstaculo.obtener_rectangulo()):
+                # Para bloques, solo cuenta como colisión si el jugador choca por los lados o desde abajo
+                if isinstance(obstaculo, Bloque):
+                    # Si el jugador está cayendo y aterriza encima, no es colisión
+                    if (jugador.velocidad_y >= 0 and 
+                        rect_jugador.bottom >= obstaculo.y and
+                        rect_jugador.bottom - jugador.velocidad_y <= obstaculo.y):
+                        continue  # No es colisión, es un aterrizaje
                 return True
         return False
     
@@ -283,6 +350,10 @@ while ejecutando:
                     nivel = int(boton_presionado.split("_")[1])
                     juego.cambiar_nivel(nivel)
                     juego.cambiar_estado("jugando")
+            
+            # Salto con click izquierdo durante el juego
+            elif juego.estado == "jugando" and evento.button == 1:  # Botón izquierdo
+                juego.jugador.saltar()
         
         if evento.type == pygame.KEYDOWN:
             if juego.estado == "jugando" and evento.key == pygame.K_SPACE:
@@ -299,7 +370,7 @@ while ejecutando:
         nivel_actual = juego.obtener_nivel_actual()
         
         # Actualizar jugador y nivel
-        juego.jugador.actualizar()
+        juego.jugador.actualizar(nivel_actual.obstaculos)
         nivel_actual.actualizar()
         
         # Verificar colisiones
